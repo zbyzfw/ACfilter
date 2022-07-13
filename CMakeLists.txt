@@ -15,7 +15,7 @@ set(PYTHON_EXECUTABLE "D:/Miniconda3/envs/pybind/python")
 add_subdirectory(${CMAKE_SOURCE_DIR}/pybind11-master)
 
 # pybind11内部函数
-pybind11_add_module(example filter.cpp)
+pybind11_add_module(example example.cpp)
 
 target_include_directories(example PRIVATE ${PYTHON3_INC_DIR})
 

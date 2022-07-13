@@ -14,6 +14,10 @@ struct Dog : Pet {
   std::string bark() const { return "woof!"; }
 };
 
+int add(int x, int y){
+  return x + y;
+}
+
 //可以使用class_::def_property()(只读成员使用class_::def_property_readonly())来定义并私有成员，并生成相应的setter和geter方法：
 PYBIND11_MODULE(example, m) {
   py::class_<Pet>(m, "Pet")
@@ -24,5 +28,5 @@ PYBIND11_MODULE(example, m) {
   py::class_<Dog, Pet /* <- specify C++ parent type */>(m, "Dog")
       .def(py::init<const std::string &>())
       .def("bark", &Dog::bark);
-
+  m.def("add",&add);
 }

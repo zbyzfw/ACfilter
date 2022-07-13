@@ -21,7 +21,7 @@ struct node {
   char w;
   bool hasEnd = false;
   int wordNum = 0;
-  node(char w) : w(w) {} // 构造函数， 初始化列表方式
+  node(char w) : w(w) {} // 构造函数， 初始化列表方式 :w(w)等价于{w=w}
 
   // 获取下一个节点
   node *findNextNode(char w) {
@@ -168,7 +168,14 @@ double getSeconds(chrono::time_point<chrono::system_clock> &start,
 
 PYBIND11_MODULE(acfilter, m) {
   m.doc() = "sens word filter with AC auto machine"; // optional module docstring
-  m.def("add", &add, "A function which adds two numbers");
+
+  py::class_<node>(m, "node")
+//  .def(py::init<const std::string &>())
+    .def_readonly("name", &node::w);
+//  .def("setName", &Pet::setName)
+  m.def("create_word_tree", &CreateWordTree, "A function which create word tree");
+  m.def("createAC",&CreateACAutomation,"A function which ");
+  m.def("filter",&WordFilterDFA,"A function which adds two numbers");
 }
 
 int main() {
