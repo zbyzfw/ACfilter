@@ -52,7 +52,58 @@ void WordFilterNormal(const string &input, const vector<string> &word_list, stri
   }
 }
 
-// 接收一个词典链表和一个链表指针
+void CreateAC(const string word_path) {
+    ifstream ifs; // 实例化文件读取类
+    vector<string> word_list; // 定义链表
+    // reserve的作用是更改vector的容量（capacity），使vector至少可以容纳n个元素。
+    // 如果n大于vector当前的容量，reserve会对vector进行扩容。其他情况下都不会重新分配vector的存储空间
+    word_list.reserve(2000);
+    string word;
+    cout << "start DFA" << endl;
+    ifs.open(word_path);
+    if (!ifs)
+        return 1;
+    // 按行读取为字典链表 无大括号只执行最近的一条语句
+    while (getline(ifs, word))
+        word_list.emplace_back(word);
+
+    ifs.close();
+    auto root = new node('\0');
+    root->nextNodeVector->reserve(256);
+    // node *root = WordTree
+    if (root == nullptr)
+        return;
+
+    for (auto w : word_list) {
+        if (w.empty())
+            continue;
+
+        auto currentNode = root;
+        int index = 0;
+        while (index < w.length()) {
+            node *find = currentNode->findNextNode(w[index]);
+            // 按单个词的长度遍历，若不为空指针，切换到当前节点
+            if (find != nullptr)
+                currentNode = find;
+            else {
+                // 给节点赋值
+                auto newNode = new node(w[index]);
+                newNode->nextNodeVector->reserve(3);
+                currentNode->nextNodeVector->emplace_back(newNode);
+                currentNode = newNode;
+            }
+
+            index++;
+            if (index == w.length()) {
+                currentNode->hasEnd = true;
+                // (int)将后方的值转换为int
+                currentNode->wordNum = (int) w.length();
+            }
+        }
+    }
+}
+
+// 接收一个词典链表(输入参数)和一个链表指针(输出参数)
 void CreateWordTree(const vector<string> &word_list, node *root) {
   if (root == nullptr)
     return;
@@ -174,8 +225,8 @@ PYBIND11_MODULE(acfilter, m) {
     .def_readonly("name", &node::w);
 //  .def("setName", &Pet::setName)
   m.def("create_word_tree", &CreateWordTree, "A function which create word tree");
-  m.def("createAC",&CreateACAutomation,"A function which ");
-  m.def("filter",&WordFilterDFA,"A function which adds two numbers");
+  m.def("createAC",&CreateACAutomation,"A function which trans word tree to ac");
+  m.def("filter",&WordFilterDFA,"A function which return a vector");
 }
 
 int main() {
