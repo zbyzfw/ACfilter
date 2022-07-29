@@ -8,6 +8,7 @@
 #include <Windows.h>
 // 使用pybind11
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 namespace py = pybind11;
 
 using namespace std;
@@ -52,7 +53,7 @@ void WordFilterNormal(const string &input, const vector<string> &word_list, stri
   }
 }
 
-void CreateAC(const string word_path) {
+node* CreateTree(const string word_path) {
     ifstream ifs; // 实例化文件读取类
     vector<string> word_list; // 定义链表
     // reserve的作用是更改vector的容量（capacity），使vector至少可以容纳n个元素。
@@ -62,17 +63,15 @@ void CreateAC(const string word_path) {
     cout << "start DFA" << endl;
     ifs.open(word_path);
     if (!ifs)
-        return 1;
+        return nullptr;
     // 按行读取为字典链表 无大括号只执行最近的一条语句
     while (getline(ifs, word))
         word_list.emplace_back(word);
 
     ifs.close();
+    // 定义对象指针
     auto root = new node('\0');
     root->nextNodeVector->reserve(256);
-    // node *root = WordTree
-    if (root == nullptr)
-        return;
 
     for (auto w : word_list) {
         if (w.empty())
@@ -101,6 +100,7 @@ void CreateAC(const string word_path) {
             }
         }
     }
+    return root;
 }
 
 // 接收一个词典链表(输入参数)和一个链表指针(输出参数)
@@ -175,6 +175,44 @@ void CreateACAutomation(node *root) {
   }
 }
 
+vector<string> WordFilter(const string &input, node *root) {
+  vector<string> words;
+  string output = input;
+  if (input.empty() || root == nullptr || root->nextNodeVector->size() == 0){
+    vector<string> sa;
+    return sa;
+  }
+  int index = 0;
+  int lastMarkIndex = -1;
+  auto currentNode = root;
+  while (index < input.length()) {
+    node *find = currentNode->findNextNode(input[index]);
+    // 当没找到当前字符且failNode存在，切换到failNode继续查找
+    while (find == nullptr && currentNode->failNode != nullptr) {
+      currentNode = currentNode->failNode;
+      find = currentNode->findNextNode(input[index]);
+    }
+    // 当failNode为空指针（此时currentNode一般为root）
+    if (find == nullptr) {
+      currentNode = root;
+      index++;
+      continue;
+    }
+    // 查找到字符
+    currentNode = find;
+    if (find->hasEnd) {
+      // 最后标记
+      //      int start = lastMarkIndex + 1 > index - find->wordNum + 1 ? lastMarkIndex + 1 : index - find->wordNum + 1;
+      int start = index - find->wordNum + 1;
+      //  for (int i = start; i <= index; i++)
+      words.emplace_back(output.substr(start,find->wordNum));
+      lastMarkIndex = index;
+    }
+    index++;
+  }
+  return words;
+}
+
 void WordFilterDFA(const string &input, node *root, string &output, vector<string> &words) {
   output = input;
   if (input.empty() || root == nullptr || root->nextNodeVector->size() == 0)
@@ -206,7 +244,6 @@ void WordFilterDFA(const string &input, node *root, string &output, vector<strin
       words.emplace_back(output.substr(start,find->wordNum));
       lastMarkIndex = index;
     }
-
     index++;
   }
 }
@@ -217,84 +254,84 @@ double getSeconds(chrono::time_point<chrono::system_clock> &start,
   return double(duration.count()) / 1000000;
 }
 
-PYBIND11_MODULE(acfilter, m) {
+PYBIND11_MODULE(example, m) {
   m.doc() = "sens word filter with AC auto machine"; // optional module docstring
 
   py::class_<node>(m, "node")
 //  .def(py::init<const std::string &>())
     .def_readonly("name", &node::w);
 //  .def("setName", &Pet::setName)
-  m.def("create_word_tree", &CreateWordTree, "A function which create word tree");
+  m.def("create_word_tree", &CreateTree, "A function which create word tree");
   m.def("createAC",&CreateACAutomation,"A function which trans word tree to ac");
-  m.def("filter",&WordFilterDFA,"A function which return a vector");
+  m.def("filter",&WordFilter,"A function which return a vector");
 }
 
-int main() {
-  auto start = chrono::system_clock::now(); // 开始时间
-  SetConsoleOutputCP(CP_UTF8); // 设置window控制台编码为utf-8
-  ifstream ifs; // 实例化文件读取类
-  vector<string> word_list; // 定义链表
-  // reserve的作用是更改vector的容量（capacity），使vector至少可以容纳n个元素。
-  // 如果n大于vector当前的容量，reserve会对vector进行扩容。其他情况下都不会重新分配vector的存储空间
-  word_list.reserve(200000);
-  string word;
-  cout << "start DFA" << endl;
-  ifs.open("key.txt");
-  if (!ifs)
-    return 1;
-  // 按行读取为字典链表 无大括号只执行最近的一条语句
-  while (getline(ifs, word))
-    word_list.emplace_back(word);
-
-  ifs.close();
-  cout << "load key file" << endl;
-  auto end = chrono::system_clock::now();
-  cout << "Create word_list num= " << word_list.size() << " time= " << getSeconds(start, end) << "s"
-  << endl;
-
-  string input;
-  string output;
-  vector<string> words2;
-  ifs.open("input.txt");
-  if (!ifs)
-    return 1;
-  cout << "load input file" << endl;
-
-  // 按行读取要检测的文本
-  while (getline(ifs, word))
-    input += word;
-
-  ifs.close();
-
-  cout << "input: " << input << endl << endl;
-  start = chrono::system_clock::now();
-  // 暴力法敏感词过滤
-  WordFilterNormal(input, word_list, output, words2);
-  end = chrono::system_clock::now();
-  cout << "Word Filter Normal time= " << getSeconds(start, end) << "s" << endl;
-  //  cout << "output: " << output << endl << endl;
-  for (const auto &c : words2) cout << c << " ";
-
-  start = chrono::system_clock::now();
-  auto WordTree = new node('\0');
-  WordTree->nextNodeVector->reserve(256);
-  CreateWordTree(word_list, WordTree);
-  end = chrono::system_clock::now();
-  cout << "Create Filtered Word Tree time= " << getSeconds(start, end) << "s" << endl;
-
-  start = chrono::system_clock::now();
-  CreateACAutomation(WordTree);
-  end = chrono::system_clock::now();
-  cout << "Create AC Automation time= " << getSeconds(start, end) << "s" << endl;
-
-  start = chrono::system_clock::now();
-  string output2;
-  vector<string> words;
-  WordFilterDFA(input, WordTree, output2, words);
-  end = chrono::system_clock::now();
-  cout << "Word Filter DFA time= " << getSeconds(start, end) << "s" << endl;
-  cout << "word output: " << words[0] << endl;
-  for (const auto &c : words) cout << c << " ";
-  return 0;
-}
+//int main() {
+//  auto start = chrono::system_clock::now(); // 开始时间
+//  SetConsoleOutputCP(CP_UTF8); // 设置window控制台编码为utf-8
+//  ifstream ifs; // 实例化文件读取类
+//  vector<string> word_list; // 定义链表
+//  // reserve的作用是更改vector的容量（capacity），使vector至少可以容纳n个元素。
+//  // 如果n大于vector当前的容量，reserve会对vector进行扩容。其他情况下都不会重新分配vector的存储空间
+//  word_list.reserve(200000);
+//  string word;
+//  cout << "start DFA" << endl;
+//  ifs.open("key.txt");
+//  if (!ifs)
+//    return 1;
+//  // 按行读取为字典链表 无大括号只执行最近的一条语句
+//  while (getline(ifs, word))
+//    word_list.emplace_back(word);
+//
+//  ifs.close();
+//  cout << "load key file" << endl;
+//  auto end = chrono::system_clock::now();
+//  cout << "Create word_list num= " << word_list.size() << " time= " << getSeconds(start, end) << "s"
+//  << endl;
+//
+//  string input;
+//  string output;
+//  vector<string> words2;
+//  ifs.open("input.txt");
+//  if (!ifs)
+//    return 1;
+//  cout << "load input file" << endl;
+//
+//  // 按行读取要检测的文本
+//  while (getline(ifs, word))
+//    input += word;
+//
+//  ifs.close();
+//
+//  cout << "input: " << input << endl << endl;
+//  start = chrono::system_clock::now();
+//  // 暴力法敏感词过滤
+//  WordFilterNormal(input, word_list, output, words2);
+//  end = chrono::system_clock::now();
+//  cout << "Word Filter Normal time= " << getSeconds(start, end) << "s" << endl;
+//  //  cout << "output: " << output << endl << endl;
+//  for (const auto &c : words2) cout << c << " ";
+//
+//  start = chrono::system_clock::now();
+//  auto WordTree = new node('\0');
+//  WordTree->nextNodeVector->reserve(256);
+//  CreateWordTree(word_list, WordTree);
+//  end = chrono::system_clock::now();
+//  cout << "Create Filtered Word Tree time= " << getSeconds(start, end) << "s" << endl;
+//
+//  start = chrono::system_clock::now();
+//  CreateACAutomation(WordTree);
+//  end = chrono::system_clock::now();
+//  cout << "Create AC Automation time= " << getSeconds(start, end) << "s" << endl;
+//
+//  start = chrono::system_clock::now();
+//  string output2;
+//  vector<string> words;
+//  WordFilterDFA(input, WordTree, output2, words);
+//  end = chrono::system_clock::now();
+//  cout << "Word Filter DFA time= " << getSeconds(start, end) << "s" << endl;
+//  cout << "word output: " << words[0] << endl;
+//  for (const auto &c : words) cout << c << " ";
+//  return 0;
+//}
 
